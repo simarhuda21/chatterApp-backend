@@ -2,10 +2,12 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const mongodb = require('mongodb');
 const socket = require('socket.io');
+const mail = require("./mail/mail");
+const bcrypt = require("bcrypt");
 const port = 3000;
 let users;
 let count;
-let message;
+let messages = [];
 
 const app = express();
 
@@ -49,7 +51,7 @@ MongoClient.connect('mongodb://localhost:27017/WeChat',{useNewUrlParser: true}, 
                     }
                 });
                 if(count == 0) {
-                    chatRooms.insert({name: data.room, messages: [] });
+                    chatRooms.insertOne({name: data.room, messages: [] });
                 }
             });
         });
@@ -57,7 +59,7 @@ MongoClient.connect('mongodb://localhost:27017/WeChat',{useNewUrlParser: true}, 
 
     socket.on('message', (data) => {
         io.in(data.room).emit('new message', {user: data.user, message: data.message});
-        chatRooms.update({name: data.room}, {$push:{messages: {user:data.user, message: data.message}}},(err,res) => {
+        chatRooms.updateOne({name: data.room}, {$push:{messages: {user:data.user, message: data.message}}},(err,res) => {
             if(err) {
                 console.log(err);
                 return false;
@@ -80,7 +82,8 @@ app.post('/api/users', (req, res, next) => {
     let user = {
         username: req.body.username,
         email: req.body.email,
-        password: req.body.password
+        password: req.body.password,
+        
     };
     let count = 0;    
     users.find({}).toArray((err, Users) => {
@@ -94,11 +97,15 @@ app.post('/api/users', (req, res, next) => {
         }
         // Add user if not already signed up
         if(count == 0){
-            users.insert(user, (err, User) => {
+            users.insertOne(user, (err, User) => {
                 if(err){
                     res.send(err);
                 }
                 res.json(User);
+                let toEmail = user.email;
+                let subject = "Welcome to WeChat";
+                let message = "Hello "+ user.username + " "+ "your user id is: "+ user.email + " " + "and password is: " + user.password; 
+                mail.Mail(toEmail, subject, message);
             });
         }
         else {
@@ -109,3 +116,47 @@ app.post('/api/users', (req, res, next) => {
     
 });
 
+app.post('/api/login', (req, res) => {
+    let isPresent = false;
+    let correctPassword = false;
+    let loggedInUser;
+
+    users.find({}).toArray((err, users) => {
+        if(err) return res.send(err);
+        users.forEach((user) => {
+            if((user.username == req.body.username)) {
+                if(user.password == req.body.password) {
+                    isPresent = true;
+                    correctPassword = true;
+                    loggedInUser = {
+                        username: user.username,
+                        email: user.email
+                    }    
+                } else {
+                    isPresent = true;
+                }
+            }
+        });
+            res.json({ isPresent: isPresent, correctPassword: correctPassword, user: loggedInUser });
+    });
+}); 
+
+app.get('/api/users', (req, res, next) => {
+    users.find({}, {username: 1, email: 1, _id: 0}).toArray((err, users) => {
+        if(err) {
+            res.send(err);
+        }
+        res.json(users);
+    });
+});
+
+app.get('/chatroom/:room', (req, res, next) => {
+    let room = req.params.room;
+    chatRooms.find({name: room}).toArray((err, chatroom) => {
+        if(err) {
+            console.log(err);
+            return false;
+        }
+        res.json(chatroom[0].messages)
+    });
+});
