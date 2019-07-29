@@ -4,8 +4,22 @@ const bodyParser = require('body-parser');
 const mongodb = require('mongodb');
 const socket = require('socket.io');
 const mail = require("./mail/mail");
+var assert = require('assert');
 const bcrypt = require("bcrypt");
 const user = require('./model/user')
+///////////////////MULTER//////////
+var multer = require('multer');
+var storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, './uploads')
+    },
+    filename: (req, file, cb) => {
+      cb(null, file.fieldname + '-' + Date.now())
+    }
+});
+var upload = multer({storage: storage});
+
+/////////////////////////////////////////////////
 require('dotenv').config();
 const port = 3000;
 let users;
@@ -56,7 +70,7 @@ MongoClient.connect('mongodb://localhost:27017/WeChat', { useNewUrlParser: true 
                     }
                 });
                 if (count == 0) {
-                    chatRooms.insertOne({ name: data.room, messages: [] });
+                    chatRooms.insertOne({ name: data.room, messages: [], imagePath: [] });
                 }
             });
         });
@@ -72,6 +86,19 @@ MongoClient.connect('mongodb://localhost:27017/WeChat', { useNewUrlParser: true 
                 console.log("Document updated");
             });
         });
+
+// ////////////////////////Image send
+        socket.on('image', (data) => {
+            io.in(data.room).emit('new Image', { user: data.user, image: data.image, buffer:buf });
+            chatRooms.updateOne({ name: data.room }, { $push: { imagePath: { user: data.user, image: data.image ,buffer: buf.toString('base64')  } } }, (err, res) => {
+                if (err) {
+                    console.log(err);
+                    return false;
+                }
+                console.log("Document updated");
+            });
+        });
+
         socket.on('typing', (data) => {
             socket.broadcast.in(data.room).emit('typing', { data: data, isTyping: true });
         });
@@ -82,6 +109,24 @@ MongoClient.connect('mongodb://localhost:27017/WeChat', { useNewUrlParser: true 
 app.get('/', (req, res, next) => {
     res.send('Welcome to the express server...');
 });
+
+app.post('/api/fileUpload', upload.single('photo'), (req, res, next) => {
+    MongoClient.connect('mongodb://localhost:27017/WeChat', (err, db) => {
+        assert.equal(null, err);
+        insertDocuments(db, './uploads/' + req.file.filename, () => {
+            db.close();
+            res.json({'message': 'File uploaded successfully'});
+        });
+    });
+});
+
+var insertDocuments = function(db, filePath, callback) {
+    console.log(filePath);
+    chatRooms.insertOne({'imagePath' : filePath, messages:[] }, (err, result) => {
+        assert.equal(err, null);
+        callback(result);
+    });
+}
 
 app.post('/api/users', (req, res, next) => {
     let user = {
@@ -175,6 +220,6 @@ app.get('/chatroom/:room', (req, res, next) => {
             console.log(err);
             return false;
         }
-        res.json(chatroom[0].messages)
+        return res.json(chatroom[0])
     });
 });
