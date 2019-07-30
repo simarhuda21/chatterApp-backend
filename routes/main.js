@@ -1,43 +1,21 @@
 const express = require('express');
-const jwt = require('jsonwebtoken');
-const bodyParser = require('body-parser');
-const mongodb = require('mongodb');
-const socket = require('socket.io');
-const mail = require("./mail/mail");
-var assert = require('assert');
-const bcrypt = require("bcrypt");
-const user = require('./model/user');
-const cors = require('cors');
-///////////////////MULTER//////////
+const router = express.Router();
 var multer = require('multer');
+const jwt = require('jsonwebtoken');
+const mail = require("../mail/mail");
+let messages = [];
+const SECRET_KEY = process.env.SECRET_KEY;
+
 var storage = multer.diskStorage({
     destination: (req, file, cb) => {
-      cb(null, './public/uploads')
+      cb(null, './uploads')
     },
     filename: (req, file, cb) => {
-      cb(null, file.fieldname + '-' + Date.now() + file.originalname)
+      cb(null, file.fieldname + '-' + Date.now())
     }
 });
 var upload = multer({storage: storage});
-
-/////////////////////////////////////////////////
-var corsOptions = {
-    origin: '*',
-    optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204 
-}
-
-const app = express();
-require('dotenv').config();
-app.use(cors());
-app.use(bodyParser.json());
-app.use(express.static("./public"));
-
-const port = 3000;
 let users;
-let count;
-let messages = [];
-
-const SECRET_KEY = process.env.SECRET_KEY;
 const MongoClient = mongodb.MongoClient;
 
 MongoClient.connect('mongodb://localhost:27017/WeChat', { useNewUrlParser: true }, (err, Database) => {
@@ -87,10 +65,10 @@ MongoClient.connect('mongodb://localhost:27017/WeChat', { useNewUrlParser: true 
             });
         });
 
-// ////////////////////////Image send
+//Image send ***********************
         socket.on('image', (data) => {
             io.in(data.room).emit('new Image', { user: data.user, image: data.image,  });
-            chatRooms.updateOne({ name: data.room }, { $push: { imagePath: { user: data.user, image: "./uploads/photo-1564485292458Screenshot from 2019-06-28 11-18-27.png"  } } }, (err, res) => {
+            chatRooms.updateOne({ name: data.room }, { $push: { imagePath: { user: data.user, image: data.image  } } }, (err, res) => {
                 if (err) {
                     console.log(err);
                     return false;
@@ -105,29 +83,29 @@ MongoClient.connect('mongodb://localhost:27017/WeChat', { useNewUrlParser: true 
     });
 });
 
-app.get('/', (req, res, next) => {
+router.get('/', (req, res, next) => {
     res.send('Welcome to the express server...');
 });
 
-app.post('/api/fileUpload', upload.single('photo'), (req, res, next) => {
+router.post('/api/fileUpload', upload.single('photo'), (req, res, next) => {
     MongoClient.connect('mongodb://localhost:27017/WeChat', (err, db) => {
         assert.equal(null, err);
-        insertDocuments(db, './public/uploads/' + req.file.filename, () => {
+        insertDocuments(db, './uploads/' + req.file.filename, () => {
             db.close();
-            res.json({'message': 'File uploaded successfully'});
+            res.json({ 'message': 'File uploaded successfully' });
         });
     });
 });
 
-var insertDocuments = function(db, filename, callback) {
-    console.log(filename);
-    chatRooms.insertOne({'imagePath' : filename, messages:[] }, (err, result) => {
+var insertDocuments = function (db, filePath, callback) {
+    console.log(filePath);
+    chatRooms.insertOne({ 'imagePath': filePath, messages: [] }, (err, result) => {
         assert.equal(err, null);
         callback(result);
     });
 }
 
-app.post('/api/users', (req, res, next) => {
+router.post('/api/users', (req, res, next) => {
     let user = {
         username: req.body.username,
         email: req.body.email,
@@ -172,7 +150,7 @@ app.post('/api/users', (req, res, next) => {
 
 });
 
-app.post('/api/login', (req, res) => {
+router.post('/api/login', (req, res) => {
     let isPresent = false;
     let correctPassword = false;
     let loggedInUser;
@@ -202,27 +180,23 @@ app.post('/api/login', (req, res) => {
     });
 });
 
-app.get('/api/users', (req, res, next) => {
-    users.find({}, {username: 1, email: 1, _id: 0}).toArray((err, users) => {
-        if(err) {
+router.get('/api/users', (req, res, next) => {
+    users.find({}, { username: 1, email: 1, _id: 0 }).toArray((err, users) => {
+        if (err) {
             res.send(err);
         }
         res.json(users);
     });
 });
 
-app.get('/chatroom/:room', (req, res, next) => {
-    console.log("chatroooom");
+router.get('/chatroom/:room', (req, res, next) => {
     let room = req.params.room;
     chatRooms.find({ name: room }).toArray((err, chatroom) => {
         if (err) {
             console.log(err);
             return false;
         }
-        return res.json(chatroom[0]);
+        return res.json(chatroom[0])
     });
 });
-
-
-
-
+module.exports=router;
