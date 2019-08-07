@@ -5,9 +5,10 @@ const mongodb = require('mongodb');
 const socket = require('socket.io');
 const mail = require("./mail/mail");
 var assert = require('assert');
-const bcrypt = require("bcrypt");
-const user = require('./model/user');
+const mongoose = require('mongoose');
 const cors = require('cors');
+const siofu = require('socketio-file-upload');
+const path = require('path');
 ///////////////////MULTER//////////
 var multer = require('multer');
 var storage = multer.diskStorage({
@@ -90,7 +91,9 @@ MongoClient.connect('mongodb://localhost:27017/WeChat', { useNewUrlParser: true 
 // ////////////////////////Image send
         socket.on('image', (data) => {
             io.in(data.room).emit('new Image', { user: data.user, image: data.image,  });
-            chatRooms.updateOne({ name: data.room }, { $push: { imagePath: { user: data.user, image: "./uploads/photo-1564485292458Screenshot from 2019-06-28 11-18-27.png"  } } }, (err, res) => {
+            const uploader = new siofu();
+             uploader.dir = path.join(__dirname, './public/uploads');
+            chatRooms.updateOne({ name: data.room }, { $push: { imagePath: { user: data.user, image: data.image  } } }, (err, res) => {
                 if (err) {
                     console.log(err);
                     return false;
