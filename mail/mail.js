@@ -1,5 +1,5 @@
 const nodemailer = require("nodemailer");
-
+require('dotenv').config();
 
 exports.Mail = function (toEmail, subject, message) {
 // console.log("tomailwwwwwwwwwwww", toEmail,"sub", subject,"msg", message);
@@ -7,8 +7,8 @@ exports.Mail = function (toEmail, subject, message) {
 const transporter = nodemailer.createTransport({
 service: 'gmail',
 auth: {
-user: "simarsingh.huda.sa@gmail.com",
-pass: "cxAcXreFfbde"
+user: process.env.EMAIL,
+pass: process.env.EMAIL_PASSWORD
 }
 });
 
