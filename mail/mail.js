@@ -5,10 +5,14 @@ exports.Mail = function (toEmail, subject, message) {
 // console.log("tomailwwwwwwwwwwww", toEmail,"sub", subject,"msg", message);
 
 const transporter = nodemailer.createTransport({
-service: 'gmail',
+service: 'ses',
 auth: {
-user: process.env.EMAIL,
-pass: process.env.EMAIL_PASSWORD
+server_name: process.env.SERVER_NAME,
+port_number: process.env.PORT_NUMBER,
+aws_access_key: process.env.AWSAccessKeyId,
+aws_secret_key: process.env.AWSSecretKey
+
+
 }
 });
 
