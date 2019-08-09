@@ -5,15 +5,13 @@ exports.Mail = function (toEmail, subject, message) {
 // console.log("tomailwwwwwwwwwwww", toEmail,"sub", subject,"msg", message);
 
 const transporter = nodemailer.createTransport({
-service: 'ses',
+host: process.env.HOST,
+port: process.env.PORT_NUMBER,
 auth: {
-server_name: process.env.SERVER_NAME,
-port_number: process.env.PORT_NUMBER,
-aws_access_key: process.env.AWSAccessKeyId,
-aws_secret_key: process.env.AWSSecretKey
-
-
+user: process.env.SMTP_USERNAME,
+pass: process.env.SMTP_PASSWORD
 }
+
 });
 
 var mailOptions = {

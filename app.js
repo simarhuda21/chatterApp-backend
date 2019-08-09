@@ -9,6 +9,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const siofu = require('socketio-file-upload');
 const path = require('path');
+const bcrypt=require("bcryptjs");
 ///////////////////MULTER//////////
 var multer = require('multer');
 var storage = multer.diskStorage({
@@ -32,7 +33,7 @@ require('dotenv').config();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static("./public"));
-
+let value=false;
 const port = 3000;
 let users;
 let count;
@@ -131,12 +132,15 @@ var insertDocuments = function(db, filename, callback) {
 }
 
 app.post('/api/users', (req, res, next) => {
+    const encrypted=bcrypt.hashSync(req.body.password)
     let user = {
         username: req.body.username,
         email: req.body.email,
-        password: req.body.password,
+        password:encrypted,
+        location: req.body.location  
 
     };
+    
     let count = 0;
     users.find({}).toArray((err, Users) => {
         if (err) {
@@ -158,7 +162,7 @@ app.post('/api/users', (req, res, next) => {
                 };
 
                 let token = jwt.sign(payload, SECRET_KEY);
-                console.log("tokennnnnnnnn", token);
+                
 
                 let toEmail = user.email;
                 let subject = "Welcome to WeChat";
@@ -180,27 +184,36 @@ app.post('/api/login', (req, res) => {
     let correctPassword = false;
     let loggedInUser;
     let token;
-    users.find({}).toArray((err, users) => {
-        if (err) return res.send(err);
-        users.forEach((user) => {
-            if ((user.username == req.body.username)) {
-                if (user.password == req.body.password) {
+    users.findOne({ username: req.body.username },function (err, data) {
+        if (err) {
+            console.log(err);
+            } if (!data) {
+            
+            console.log("Sorry! username not found!")
+            res.status(400).json("Sorry! email not found")
+            } else {
+        
+                  
+                  value=bcrypt.compareSync(req.body.password,data.password)
+                  console.log("value", value);
+                if (value) {
                     let payload = {
-                        subject: users._id
+                        subject: data._id
                     };
                     token = jwt.sign(payload, SECRET_KEY);
                     console.log("tokennnnnnnnn", token);
                     isPresent = true;
                     correctPassword = true;
                     loggedInUser = {
-                        username: user.username,
-                        email: user.email
+                        username: data.username,
+                        email: data.email
                     }
                 } else {
-                    isPresent = true;
+                    isPresent=true;
+                    console.log("invalid password");
                 }
             }
-        });
+        
         return res.send({ isPresent: isPresent, correctPassword: correctPassword, user: loggedInUser, "token": token });
     });
 });
@@ -215,7 +228,6 @@ app.get('/api/users', (req, res, next) => {
 });
 
 app.get('/chatroom/:room', (req, res, next) => {
-    console.log("chatroooom");
     let room = req.params.room;
     chatRooms.find({ name: room }).toArray((err, chatroom) => {
         if (err) {
