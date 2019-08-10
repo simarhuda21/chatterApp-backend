@@ -90,6 +90,8 @@ MongoClient.connect('mongodb://localhost:27017/WeChat', { useNewUrlParser: true 
                 console.log("Document updated");
             });
         });
+        socket.on('typing', (data) => {
+            socket.broadcast.in(data.room).emit('typing', { data: data, isTyping: true });
 
         // ////////////////////////Image send
         socket.on('image', (data) => {
@@ -105,8 +107,7 @@ MongoClient.connect('mongodb://localhost:27017/WeChat', { useNewUrlParser: true 
             });
         });
 
-        socket.on('typing', (data) => {
-            socket.broadcast.in(data.room).emit('typing', { data: data, isTyping: true });
+       
         });
     });
 });
@@ -204,13 +205,11 @@ app.post('/api/login', (req, res) => {
 
 
             value = bcrypt.compareSync(req.body.password, data.password)
-            console.log("value", value);
             if (value) {
                 let payload = {
                     subject: data._id
                 };
                 token = jwt.sign(payload, SECRET_KEY);
-                console.log("tokennnnnnnnn", token);
                 isPresent = true;
                 correctPassword = true;
                 loggedInUser = {
