@@ -5,22 +5,24 @@ const mongodb = require('mongodb');
 const socket = require('socket.io');
 const mail = require("./mail/mail");
 var assert = require('assert');
-const mongoose = require('mongoose');
+// require("./model/db");
+// const mongoose = require("mongoose");
+// const users = mongoose.model("User");
 const cors = require('cors');
 const siofu = require('socketio-file-upload');
 const path = require('path');
-const bcrypt=require("bcryptjs");
+const bcrypt = require("bcryptjs");
 ///////////////////MULTER//////////
 var multer = require('multer');
 var storage = multer.diskStorage({
     destination: (req, file, cb) => {
-      cb(null, './public/uploads')
+        cb(null, './public/uploads')
     },
     filename: (req, file, cb) => {
-      cb(null, file.fieldname + '-' + Date.now() + file.originalname)
+        cb(null, file.fieldname + '-' + Date.now() + file.originalname)
     }
 });
-var upload = multer({storage: storage});
+var upload = multer({ storage: storage });
 
 /////////////////////////////////////////////////
 var corsOptions = {
@@ -33,7 +35,7 @@ require('dotenv').config();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static("./public"));
-let value=false;
+let value = false;
 const port = 3000;
 let users;
 let count;
@@ -89,12 +91,12 @@ MongoClient.connect('mongodb://localhost:27017/WeChat', { useNewUrlParser: true 
             });
         });
 
-// ////////////////////////Image send
+        // ////////////////////////Image send
         socket.on('image', (data) => {
-            io.in(data.room).emit('new Image', { user: data.user, image: data.image,  });
+            io.in(data.room).emit('new Image', { user: data.user, image: data.image, });
             const uploader = new siofu();
-             uploader.dir = path.join(__dirname, './public/uploads');
-            chatRooms.updateOne({ name: data.room }, { $push: { imagePath: { user: data.user, image: data.image  } } }, (err, res) => {
+            uploader.dir = path.join(__dirname, './public/uploads');
+            chatRooms.updateOne({ name: data.room }, { $push: { imagePath: { user: data.user, image: data.image } } }, (err, res) => {
                 if (err) {
                     console.log(err);
                     return false;
@@ -118,29 +120,30 @@ app.post('/api/fileUpload', upload.single('photo'), (req, res, next) => {
         assert.equal(null, err);
         insertDocuments(db, './public/uploads/' + req.file.filename, () => {
             db.close();
-            res.json({'message': 'File uploaded successfully'});
+            res.json({ 'message': 'File uploaded successfully' });
         });
     });
 });
 
-var insertDocuments = function(db, filename, callback) {
+var insertDocuments = function (db, filename, callback) {
     console.log(filename);
-    chatRooms.insertOne({'imagePath' : filename, messages:[] }, (err, result) => {
+    chatRooms.insertOne({ name: data.room, imagePath: filename, messages: [] }, (err, result) => {
         assert.equal(err, null);
         callback(result);
     });
 }
 
 app.post('/api/users', (req, res, next) => {
-    const encrypted=bcrypt.hashSync(req.body.password)
+   
+    const encrypted = bcrypt.hashSync(req.body.password)
     let user = {
         username: req.body.username,
         email: req.body.email,
-        password:encrypted,
-        location: req.body.location  
+        password: encrypted,
+        location: req.body.location
 
     };
-    
+
     let count = 0;
     users.find({}).toArray((err, Users) => {
         if (err) {
@@ -149,7 +152,10 @@ app.post('/api/users', (req, res, next) => {
         }
         for (let i = 0; i < Users.length; i++) {
             if (Users[i].username == user.username)
-                count++;
+            count++;
+            if(Users[i].email == user.email)    
+            count++;
+
         }
         // Add user if not already signed up
         if (count == 0) {
@@ -162,7 +168,7 @@ app.post('/api/users', (req, res, next) => {
                 };
 
                 let token = jwt.sign(payload, SECRET_KEY);
-                
+
 
                 let toEmail = user.email;
                 let subject = "Welcome to WeChat";
@@ -173,7 +179,10 @@ app.post('/api/users', (req, res, next) => {
         }
         else {
             // Alert message logic here
+            if(count !== 0)
             res.json({ user_already_signed_up: true });
+            
+
         }
     });
 
@@ -184,43 +193,43 @@ app.post('/api/login', (req, res) => {
     let correctPassword = false;
     let loggedInUser;
     let token;
-    users.findOne({ username: req.body.username },function (err, data) {
+    users.findOne({ username: req.body.username }, function (err, data) {
         if (err) {
             console.log(err);
-            } if (!data) {
-            
+        } if (!data) {
+
             console.log("Sorry! username not found!")
             res.status(400).json("Sorry! email not found")
-            } else {
-        
-                  
-                  value=bcrypt.compareSync(req.body.password,data.password)
-                  console.log("value", value);
-                if (value) {
-                    let payload = {
-                        subject: data._id
-                    };
-                    token = jwt.sign(payload, SECRET_KEY);
-                    console.log("tokennnnnnnnn", token);
-                    isPresent = true;
-                    correctPassword = true;
-                    loggedInUser = {
-                        username: data.username,
-                        email: data.email
-                    }
-                } else {
-                    isPresent=true;
-                    console.log("invalid password");
+        } else {
+
+
+            value = bcrypt.compareSync(req.body.password, data.password)
+            console.log("value", value);
+            if (value) {
+                let payload = {
+                    subject: data._id
+                };
+                token = jwt.sign(payload, SECRET_KEY);
+                console.log("tokennnnnnnnn", token);
+                isPresent = true;
+                correctPassword = true;
+                loggedInUser = {
+                    username: data.username,
+                    email: data.email
                 }
+            } else {
+                isPresent = true;
+                console.log("invalid password");
             }
-        
+        }
+
         return res.send({ isPresent: isPresent, correctPassword: correctPassword, user: loggedInUser, "token": token });
     });
 });
 
 app.get('/api/users', (req, res, next) => {
-    users.find({}, {username: 1, email: 1, _id: 0}).toArray((err, users) => {
-        if(err) {
+    users.find({}, { username: 1, email: 1, _id: 0 }).toArray((err, users) => {
+        if (err) {
             res.send(err);
         }
         res.json(users);

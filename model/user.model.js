@@ -13,9 +13,11 @@ const UserSchema = mongoose.Schema({
         required: true
     },
     location: {
-        type
-
-    }
+        type : {
+            type: String
+        },
+        coordinates:[String, String]
+        }
 
     });
 
