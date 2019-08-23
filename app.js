@@ -5,6 +5,7 @@ const mongodb = require('mongodb');
 const socket = require('socket.io');
 const mail = require("./mail/mail");
 var assert = require('assert');
+var fs = require('fs');
 // require("./model/db");
 // const mongoose = require("mongoose");
 // const users = mongoose.model("User");
@@ -94,18 +95,36 @@ MongoClient.connect('mongodb://localhost:27017/WeChat', { useNewUrlParser: true 
             socket.broadcast.in(data.room).emit('typing', { data: data, isTyping: true });
 
         // ////////////////////////Image send
-        socket.on('image', (data) => {
-            io.in(data.room).emit('new Image', { user: data.user, image: data.image, });
-            const uploader = new siofu();
-            uploader.dir = path.join(__dirname, './public/uploads');
-            chatRooms.updateOne({ name: data.room }, { $push: { imagePath: { user: data.user, image: data.image } } }, (err, res) => {
-                if (err) {
-                    console.log(err);
-                    return false;
-                }
-                console.log("Document updated");
+        io.sockets.on('connection', function(socket){
+            fs.readFile(__dirname + '/public/uploads', function(err, buf){
+              // it's possible to embed binary data
+              // within arbitrarily-complex objects
+              socket.emit('image', { image: true, buffer: buf.toString('base64') });
+              console.log('image file is initialized');
             });
-        });
+          });
+
+          socket.on("image", function(info) {
+            if (info.image) {
+              var img = new Image();
+              img.src = 'data:image/jpeg;base64,' + info.buffer;
+        
+            }
+          });
+
+
+        // socket.on('image', (data) => {
+        //     io.in(data.room).emit('new image', { user: data.user, image: data.image, });
+        //     const uploader = new siofu();
+        //     uploader.dir = path.join(__dirname, './public/uploads');
+        //     chatRooms.updateOne({ name: data.room }, { $push: { imagePath: { user: data.user, image: data.image } } }, (err, res) => {
+        //         if (err) {
+        //             console.log(err);
+        //             return false;
+        //         }
+        //         console.log("Document updated");
+        //     });
+        // });
 
        
         });
@@ -128,7 +147,7 @@ app.post('/api/fileUpload', upload.single('photo'), (req, res, next) => {
 
 var insertDocuments = function (db, filename, callback) {
     console.log(filename);
-    chatRooms.insertOne({ name: data.room, imagePath: filename, messages: [] }, (err, result) => {
+    chatRooms.insertOne({ imagePath: filename }, (err, result) => {
         assert.equal(err, null);
         callback(result);
     });
@@ -205,6 +224,8 @@ app.post('/api/login', (req, res) => {
 
 
             value = bcrypt.compareSync(req.body.password, data.password)
+            console.log(req.body.password);
+            console.log(data.password);
             if (value) {
                 let payload = {
                     subject: data._id
